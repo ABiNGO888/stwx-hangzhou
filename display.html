@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>超级舌阿蜥 · 杭州限定关卡</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#0b1e33;overflow:hidden;
+    font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;}
+  /* 竖屏：以 9:16 为基准，高度撑满、宽度按比例自适应，左右自动留空(非黑边) */
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b1e33;}
+  #wrap{position:relative;width:min(100vw,56.25dvh);height:100dvh;max-height:100vh;overflow:hidden;background:#0b1e33;}
+  @supports not (height:100dvh){ #wrap{width:min(100vw,56.25vh);height:100vh;} }
+
+  /* 两段视频轮播：同一容器叠放，切段时交叉淡入淡出 */
+  /* [v56] 视频自适应高度居中、不裁切（contain），左右无画面处黑底 */
+  #v1,#v2{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;}
+  /* [2026-10-13 修复] 淡入淡出类挂在**外层包裹层**上：原实现把 .on 加在 <video> 上，
+     而外层 div 的内联 opacity:0 永远不变 → 两段视频都不可见（整页黑屏）。 */
+  #v1wrap,#v2wrap{position:absolute;inset:0;opacity:0;transition:opacity .6s ease;}
+  #v1wrap.on,#v2wrap.on{opacity:1;}
+
+  /* —— 右下角二维码浮层 —— */
+  #qrDock{position:absolute;right:14px;bottom:20px;z-index:10;
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+    padding:12px 12px 10px;border-radius:16px;
+    background:rgba(8,18,32,.62);backdrop-filter:blur(6px);
+    border:1px solid rgba(255,216,95,.42);
+    box-shadow:0 6px 22px rgba(0,0,0,.5);pointer-events:none;}
+  #qrDock img{width:min(30vw,17dvh,150px);height:min(30vw,17dvh,150px);display:block;
+    border-radius:10px;background:#fff;padding:5px;box-sizing:border-box;}
+  #qrDock .cap{font-size:clamp(10px,2.7vw,14px);color:#ffd85f;font-weight:700;letter-spacing:.5px;
+    white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.8);}
+  /* QR-only hotfix: author CSS display overrides default [hidden] styling unless specified. */
+  #qrDock .qr-loading{width:min(30vw,17dvh,150px);height:min(30vw,17dvh,150px);
+    box-sizing:border-box;padding:8px;border-radius:10px;background:#fff;color:#263b49;
+    display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;}
+  #qrDock .status{max-width:180px;line-height:1.45;font-size:11px;color:#e8f0ff;text-align:center;}
+  #qrDock img[hidden],#qrDock .qr-loading[hidden]{display:none !important;}
+  #qrDock.is-verified{display:none !important;}
+
+  /* —— 实体按键提示（大屏接 USB/串口按键，键盘任意键或点击即可）—— */
+  #btnHint{position:absolute;left:14px;bottom:20px;z-index:10;
+    padding:10px 14px;border-radius:12px;background:rgba(8,18,32,.6);
+    border:1px solid rgba(255,255,255,.16);color:#ffd85f;
+    font-size:clamp(10px,2.6vw,13px);line-height:1.7;letter-spacing:.3px;}
+  #btnHint b{color:#fff;font-size:1.15em;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="wrap">
+  <!-- 两段视频轮播：同一容器叠放，切段时交叉淡入淡出。
+       ⚠️ 多 <source>：浏览器按顺序取**第一个它能解的**。
+       H.264(avc1) 放前面 —— 兼容所有浏览器与大屏盒子；
+       H.265(hvc1) 放后面兜底（原片分辨率更高）。
+       原因：原始 mp4 查证为**只有 H.265、且无 H.264 轨**，而 Safari/多数安卓机/
+       很多大屏设备不解 H.265 → 会直接黑屏。单放 H.265 不可行，必须备 H.264。
+       [2026-10-13] 第 2 段原指向 intro-video/阿蜥推广-1*.mp4 —— 该文件从未入库（必黑屏），
+       现改为与 index.html 待机屏一致的「杭州现场待机画面.mp4」。 -->
+  <div id="v1wrap">
+    <video id="v1" muted loop playsinline preload="auto">
+      <source src="intro-video/竖版实机画面_h264.mp4?v=6" type="video/mp4">
+      <!-- [2026-10-14 精简] 原第 2 兜底源 竖版实机画面.mp4（57MB 未压缩）已移除：
+           h264 版全设备可解，兜底只会命中 404 拖慢加载；文件已备份至 .workbuddy/backup_57mb_video/ -->
+    </video>
+  </div>
+  <div id="v2wrap">
+    <video id="v2" muted loop playsinline preload="auto">
+      <source src="intro-video/杭州现场待机画面.mp4?v=7" type="video/mp4">
+    </video>
+  </div>
+
+    <div id="qrDock" aria-label="微信扫码直接进入超级舌阿蜥小游戏">
+      <div class="qr-loading" id="qrLoading">正在生成<br>专属小游戏码…</div>
+      <img id="qrImg" alt="扫码进入超级舌阿蜥小游戏" hidden>
+      <div class="cap">微信扫码直达小游戏</div>
+      <div class="status" id="qrState" aria-live="polite">等待专属二维码…</div>
+    </div>
+
+    <div id="btnHint">
+      按 <b>实体按键</b> 开始<br>微信扫码直达小游戏
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============ 两段视频轮播 ============
+  // 门店大屏：实机画面 + 推广短片交替循环。
+  // 实现要点：两段各自预加载并各自 loop，切换时交叉淡入淡出；
+  // 预置第二段是**关键**——只放一段的话，用户会看到画面不动。
+  //
+  // ⚠️ 这里**不能**再用 `v.src = ...` 赋值：那样会覆盖 HTML 里的 <source> 列表，
+  //    浏览器就不再按「H.264 优先、H.265 兜底」挑选，而是只认 JS 给的那一个（退回 H.265 → 黑屏）。
+  //    保留 HTML 的 <source>，这里只做静音与播放控制。
+  var HOLD_MS = [41000, 20500];        // 每段停留时长（读到大片真实时长后会自动校正，见下）
+
+  var els = [document.getElementById('v1'), document.getElementById('v2')];
+  var wraps = [document.getElementById('v1wrap'), document.getElementById('v2wrap')];
+  var cur = -1, timer = 0;
+
+  els.forEach(function (v) { v.muted = true; try { v.loop = false; } catch (e) {} });   // 不设 src，交给 <source> 决策；[2026-11-01] 播完才切，不中途断片
+  // [2026-10-13] 停留时长按片子真实时长自适应：写死常量与片长不符时，每轮末尾会「从头再播一段」
+  //   （画面与叙事同时跳回开头），观感就是声音与画面对不上。改片也不用再手改节拍。
+  els.forEach(function (v, k) {
+    v.addEventListener('loadedmetadata', function () {
+      try { var d = Number(v.duration); if (isFinite(d) && d > 0.5) HOLD_MS[k] = Math.round(d * 1000); } catch (e) {}
+    });
+    // [2026-11-01] 本段播完才切走：监听 ended，绝不中途断片（用户要求「一但播放就要播完」）
+    v.addEventListener('ended', function () {
+      if (k !== cur) return;                  // 只处理当前正在播的段
+      clearTimeout(timer);
+      show((cur + 1) % els.length);
+    });
+  });
+
+  function play(v) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+
+  function show(i) {
+    if (i === cur) return;
+    wraps.forEach(function (w, k) { w.classList.toggle('on', k === i); });
+    if (wraps[i] && !wraps[i].classList.contains('on')) wraps[i].classList.add('on');
+    play(els[i]);
+    cur = i;
+    clearTimeout(timer);
+    // [2026-11-01] 真正切换靠上面 ended 监听；这里只作超长兜底（≥90s，绝不抢在片尾前切断）
+    timer = setTimeout(function () { show((cur + 1) % els.length); }, Math.max(HOLD_MS[i] || 0, 90000) + 8000);
+  }
+
+  // 任一视频出错/自动播放被拦 → 点屏幕或按实体按键即可继续
+  function boot() { wraps[0].classList.add('on'); play(els[0]); cur = 0;
+    timer = setTimeout(function () { show(1); }, Math.max(HOLD_MS[0] || 0, 90000) + 8000); }
+  boot();
+
+  function kick() { play(els[Math.max(cur, 0)]); }
+  ['click', 'touchstart', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, kick, { passive: true });
+  });
+
+  // 页面从后台恢复时，重新起播（门店大屏常被息屏/切标签）
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) kick(); });
+
+  // 视频加载失败提示（避免门店大屏黑屏却无提示）
+  els.forEach(function (v) {
+    v.addEventListener('error', function () {
+      if (v.__shown) return; v.__shown = true;
+      var d = document.createElement('div');
+      d.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);' +
+                        'color:#fff;font-size:15px;opacity:.8;text-align:center';
+      d.textContent = '视频加载中…';
+      document.getElementById('wrap').appendChild(d);
+    });
+  });
+</script>
+
+<script>
+  // 微信小游戏动态小程序码 + 云端状态回传。
+  // 服务器 POST 创建会话并返回 {ok, sessionId, qrUrl}；小游戏经 offline_session 上报；
+  // GET ?sessionId=... 返回 {verified:true} 才自动移除码。固定网页二维码无法完成这一闭环。
+  (function () {
+    'use strict';
+    var API = 'https://cloud1-d6gu6meu3ce6fd439-1455944636.ap-shanghai.app.tcloudbase.com/api/offline/session';
+    var dock = document.getElementById('qrDock');
+    var img = document.getElementById('qrImg');
+    var loading = document.getElementById('qrLoading');
+    var status = document.getElementById('qrState');
+    var params = new URLSearchParams(location.search);
+    var kiosk = params.get('kiosk') || 'hz01';
+    var generation = 0, sessionId = '', pollTimer = 0, retryTimer = 0;
+    var creating = false, checking = false, confirmed = false;
+
+    function state(text) { status.textContent = text; }
+    function clearTimers() { clearInterval(pollTimer); clearTimeout(retryTimer); }
+    function retryIn(ms) {
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(requestSession, ms);
+    }
+    function showBackup(note) {
+      if (confirmed) return;
+      img.onload = null;
+      img.onerror = function () {
+        img.hidden = true;
+        loading.hidden = false;
+        loading.textContent = '二维码暂时不可用';
+      };
+      img.src = 'minigame-code.jpg';
+      img.hidden = false;
+      loading.hidden = true;
+      state(note + '；备用码可以进入小游戏，但无法自动确认扫码');
+    }
+    function requestSession() {
+      if (confirmed || creating) return;
+      creating = true;
+      var token = ++generation;
+      sessionId = '';
+      clearTimers();
+      loading.hidden = false;
+      loading.textContent = '专属码生成中…';
+      img.hidden = true;
+      state('正在连接微信小游戏…');
+      fetch(API, {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: 'L4', game: 'super-tongue', kiosk: kiosk })
+      }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (data) {
+        creating = false;
+        if (confirmed || token !== generation) return;
+        if (!data || !data.ok || !data.sessionId || !data.qrUrl) {
+          showBackup('专属码正在补充');
+          retryIn(data && data.poolEmpty ? 8000 : 5000);
+          return;
+        }
+        sessionId = String(data.sessionId);
+        img.onload = function () {
+          if (confirmed || token !== generation) return;
+          loading.hidden = true;
+          img.hidden = false;
+          state('扫码进入小游戏，成功后此码自动消失');
+        };
+        img.onerror = function () {
+          if (confirmed || token !== generation) return;
+          sessionId = '';
+          clearInterval(pollTimer);
+          showBackup('专属码图片加载失败');
+          retryIn(8000);
+        };
+        img.src = data.qrUrl;
+        clearInterval(pollTimer);
+        pollTimer = setInterval(function () { poll(token); }, 2000);
+        // 立即检查一次，避免扫码太快、两秒内无法感知。
+        poll(token);
+      }).catch(function () {
+        creating = false;
+        if (confirmed || token !== generation) return;
+        showBackup('服务暂时无法连接');
+        retryIn(8000);
+      });
+    }
+    function poll(token) {
+      if (confirmed || checking || !sessionId || token !== generation) return;
+      checking = true;
+      var sid = sessionId;
+      fetch(API + '?sessionId=' + encodeURIComponent(sid) + '&_=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (data) {
+          checking = false;
+          if (confirmed || token !== generation || sid !== sessionId || !data) return;
+          if (data.verified) {
+            confirmed = true;
+            clearTimers();
+            state('扫码成功');
+            dock.classList.add('is-verified');
+            window.dispatchEvent(new CustomEvent('superTongueMiniGameScanned', { detail: { kiosk: kiosk } }));
+          } else if (data.expired) {
+            requestSession();
+          }
+        }).catch(function () { checking = false; });
+    }
+    // 断网时备用码可正常跳转，但只有云端能发回确认信号。
+    requestSession();
+  })();
+</script>
+</body>
+</html>

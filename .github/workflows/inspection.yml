@@ -1,0 +1,64 @@
+name: 每日巡检·v2含第四关（只读）
+
+on:
+  schedule:
+    # UTC 01:00 = 北京时间 09:00
+    - cron: '0 1 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 只读巡检（新链接可达 / 第四关资源 / 榜单接口 / index 一致性）
+        env:
+          V2_URL: https://wbapp-1lm2p8sprfx58zvscs6iu5.app.workbuddy.host/?sharecode=7X6YVMVAKI&kiosk=hz01
+          V2_ORIGIN: https://wbapp-1lm2p8sprfx58zvscs6iu5.app.workbuddy.host
+        run: |
+          set -u
+          FAIL=0
+          echo "## v2 巡检结果（北京时间 $(TZ=Asia/Shanghai date +'%Y-%m-%d %H:%M')）" >> "$GITHUB_STEP_SUMMARY"
+
+          # 1. 带码首页可达且为 v2（含 l4-bridge 引用）
+          code=$(curl -s -o v2.html -w '%{http_code}' --max-time 30 -c jar.txt "$V2_URL")
+          size=$(wc -c < v2.html)
+          if [ "$code" = "200" ] && grep -q "l4-bridge.js" v2.html; then
+            echo "- ✅ v2 首页 HTTP 200，size=$size，含第四关接入桥" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ v2 首页异常 HTTP=$code size=$size 或缺 l4-bridge" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+
+          # 2. 第四关关键资源可达（带 cookie）
+          c1=$(curl -s -b jar.txt -o jiulong.html -w '%{http_code}' --max-time 120 "$V2_ORIGIN/jiulong.html")
+          jsize=$(wc -c < jiulong.html)
+          c2=$(curl -s -b jar.txt -o /dev/null -w '%{http_code}' --max-time 60 -r 0-100000 "$V2_ORIGIN/media/l4_transition.mp4")
+          if [ "$c1" = "200" ] && [ "$jsize" -gt 30000000 ]; then
+            echo "- ✅ jiulong.html HTTP 200（$jsize 字节，第四关 v1.05）" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ jiulong.html 异常 HTTP=$c1 size=$jsize" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+          if [ "$c2" = "200" ]; then
+            echo "- ✅ 过场影片 l4_transition.mp4 可拉取" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ 过场影片异常 HTTP=$c2" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+
+          # 3. 腾讯云榜单接口可达（只读 POST，与 _daily_lb_check.js 同一接口）
+          tx=$(curl -s -o tx.json -w '%{http_code}' --max-time 30 -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"action":"leaderboard_top","sessionId":"","limit":5}' \
+            "https://cloud1-d6gu6meu3ce6fd439-1455944636.ap-shanghai.app.tcloudbase.com/api/offline/session")
+          if [ "${tx:-000}" = "200" ] && grep -q '"ok"[[:space:]]*:\s*true' tx.json; then
+            echo "- ✅ 腾讯云榜单接口可达（leaderboard_top ok=true）" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ 腾讯云榜单接口异常 HTTP=$tx" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+
+          if [ "$FAIL" = "1" ]; then
+            echo "::warning::巡检存在异常项，请人工核对（本任务只读，绝不自动修复/重部署）"
+            exit 1
+          fi
+          echo "- 🎉 全部通过" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,9 @@
+{
+  "_note": "两侧黑边底图素材清单。video 填 mp4 相对路径（有就先播视频，自动置于 logo/ 目录下），留空则用 images + 跑马灯。images 同时用于跑马灯与中央水印，越靠前越优先。改完这里必然要重发（CACHE +1）才生效。",
+  "generatedAt": "2026-11-10T12:36:00+08:00",
+  "video": "",
+  "images": [
+    "logo/LOGO_axi_white.png",
+    "logo/LOGO_open_white.png"
+  ]
+}

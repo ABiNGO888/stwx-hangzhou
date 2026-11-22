@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>超级舌阿蜥 · 杭州线下体验</title>
+<meta http-equiv="refresh" content="0; url=./index.html">
+<style>
+  html,body{margin:0;height:100%;background:#0b1e33;color:#fff;
+    font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
+    display:flex;align-items:center;justify-content:center;text-align:center;}
+  a{color:#ffd85f;}
+</style>
+</head>
+<body>
+<div>
+  <p>页面已更新，正在进入游戏…</p>
+  <p><a href="./index.html">若未自动跳转请点此</a></p>
+</div>
+<script>
+  // 携带原参数（?kiosk= / ?view=pick 等）跳到游戏主页，避免丢失门店参数
+  (function () {
+    var qs = location.search.replace(/^\?/, '');
+    location.replace('./index.html' + (qs ? '?' + qs : ''));
+  })();
+</script>
+</body>
+</html>
