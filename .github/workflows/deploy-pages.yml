@@ -1,0 +1,42 @@
+name: 部署 GitHub Pages（发布站点）
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v2-with-l4]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 检出 v2-with-l4（原版+第四关）
+        uses: actions/checkout@v4
+        with:
+          ref: v2-with-l4
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+      - name: 上传站点工件
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: 部署后自检
+        run: |
+          sleep 20
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "${{ steps.deployment.outputs.page_url }}")
+          echo "发布后首页 HTTP=$code"
+          if [ "$code" != "200" ]; then echo "⚠️ 发布后首页非 200，请人工复核"; else echo "✅ 站点已上线"; fi
