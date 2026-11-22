@@ -1,0 +1,79 @@
+name: 每日巡检（只读）
+
+on:
+  schedule:
+    # UTC 01:00 = 北京时间 09:00
+    - cron: '0 1 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 只读巡检（页面可达 / 双域一致 / 榜单接口 / SW 特征）
+        env:
+          PAGES_URL: https://abinngo888.github.io/stwx-hangzhou/
+          LIVE_URL: https://stwx-hangzhou.app.workbuddy.host/?sharecode=UTLU3GBTEL&kiosk=hz01
+        run: |
+          set -u
+          FAIL=0
+          echo "## 巡检结果 $(date -u +'%Y-%m-%d %H:%M UTC / 北京 %H:%M' --date='+8 hours')" >> "$GITHUB_STEP_SUMMARY"
+
+          # 1. GitHub Pages 可达
+          code=$(curl -s -o pages.html -w '%{http_code}' --max-time 30 "$PAGES_URL")
+          size=$(wc -c < pages.html)
+          if [ "$code" = "200" ] && [ "$size" -gt 100000 ]; then
+            echo "- ✅ Pages HTTP 200，size=$size" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ Pages 异常 HTTP=$code size=$size" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+
+          # 2. 现网（workbuddy）带码可达
+          code2=$(curl -s -o live.html -w '%{http_code}' --max-time 30 -c jar.txt "$LIVE_URL")
+          if [ "$code2" = "200" ]; then
+            echo "- ✅ 现网 HTTP 200，size=$(wc -c < live.html)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ 现网异常 HTTP=$code2（裸链 403 属正常，带码 403 需关注）" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+
+          # 3. 双域 index 内容一致（哈希比对；Pages 副本若刚更新可能有发布延迟，先重试一次）
+          h_pages=$(sha256sum pages.html | cut -d' ' -f1)
+          h_live=$(sha256sum live.html | cut -d' ' -f1)
+          if [ "$h_pages" != "$h_live" ]; then
+            sleep 60
+            curl -s -o pages.html --max-time 30 "$PAGES_URL"
+            h_pages=$(sha256sum pages.html | cut -d' ' -f1)
+          fi
+          if [ "$h_pages" = "$h_live" ]; then
+            echo "- ✅ 双域 index.html 哈希一致 ($h_pages)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ⚠️ 双域 index.html 哈希不一致 pages=$h_pages live=$h_live（若有人刚改过代码，可能是 Pages 发布延迟或漏同步）" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+
+          # 4. SW 可拉取且 CACHE 名固定
+          curl -s -b jar.txt -o live_sw.js --max-time 30 "https://stwx-hangzhou.app.workbuddy.host/sw.js"
+          if grep -q "stwx-hz-main" live_sw.js; then
+            echo "- ✅ SW CACHE=stwx-hz-main 未变" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ SW CACHE 特征丢失（可能被 bump）" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+
+          # 5. 腾讯云榜单接口可达（只读 POST，与 _daily_lb_check.js 同一接口）
+          tx=$(curl -s -o tx.json -w '%{http_code}' --max-time 30 -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"action":"leaderboard_top","sessionId":"","limit":5}' \
+            "https://cloud1-d6gu6meu3ce6fd439-1455944636.ap-shanghai.app.tcloudbase.com/api/offline/session")
+          if [ "${tx:-000}" = "200" ] && grep -q '"ok"[[:space:]]*:\s*true' tx.json; then
+            echo "- ✅ 腾讯云榜单接口可达（leaderboard_top ok=true）" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ 腾讯云榜单接口异常 HTTP=$tx" >> "$GITHUB_STEP_SUMMARY"; FAIL=1
+          fi
+
+          if [ "$FAIL" = "1" ]; then
+            echo "::warning::巡检存在异常项，请人工核对（本任务只读，绝不自动修复/重部署）"
+            exit 1
+          fi
+          echo "- 🎉 全部通过" >> "$GITHUB_STEP_SUMMARY"
