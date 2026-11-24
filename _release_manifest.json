@@ -1,0 +1,73 @@
+{
+  "builtAt": "2026-11-22T12:15:56.197Z",
+  "cache": "stwx-hz-main",
+  "note": "CACHE 名永久固定；资源 ?v 为内容 md5 前 10 位。发布前跑 --check。",
+  "assets": {
+    "assets/workbuddy-cloud-sdk.js": {
+      "hash": "c52b7ce153",
+      "md5": "c52b7ce1534b3ad118d567fbfcc77365",
+      "size": 71891
+    },
+    "game.js": {
+      "hash": "98678cb53b",
+      "md5": "98678cb53bd8c81547d74ce7c7e61fbd",
+      "size": 50147
+    },
+    "intro-video/dance_triptych_16x9.mp4": {
+      "hash": "8eef0c1add",
+      "md5": "8eef0c1addc61bedb9a8047ad930600b",
+      "size": 8672833
+    },
+    "intro-video/杭州现场待机画面.mp4": {
+      "hash": "afbb7345ee",
+      "md5": "afbb7345ee540e81e8b186d3d24864b8",
+      "size": 5593155
+    },
+    "intro-video/竖版实机画面_h264.mp4": {
+      "hash": "66b860e39d",
+      "md5": "66b860e39d836721a346e0bd37054298",
+      "size": 7103849
+    },
+    "intro-video/阿蜥古风背景.mp4": {
+      "hash": "0ebd4d9805",
+      "md5": "0ebd4d9805f54e8a1c096174475404a0",
+      "size": 32549144
+    },
+    "intro-video/阿蜥手帐游记.mp4": {
+      "hash": "b4d9b37090",
+      "md5": "b4d9b37090b4ad7c50a79a5ada2e4702",
+      "size": 5030532
+    },
+    "runtime-sources.js": {
+      "hash": "e906184030",
+      "md5": "e9061840307b70c1382632bc203f8b98",
+      "size": 1168588
+    },
+    "video/transform_bainiangzi.mp4": {
+      "hash": "dbac50fd00",
+      "md5": "dbac50fd00f87a14b1ad1eb9358d4878",
+      "size": 2815696
+    },
+    "video/transform_xiaoqing.mp4": {
+      "hash": "0352584871",
+      "md5": "0352584871341545e56a1eed4a29a9b0",
+      "size": 4594900
+    },
+    "web-require.js": {
+      "hash": "ccc96ffb62",
+      "md5": "ccc96ffb6231be4c20bdaedc28e10bc2",
+      "size": 6822
+    },
+    "wx-shim.js": {
+      "hash": "cb6c4e8ee6",
+      "md5": "cb6c4e8ee6b2afc92439256c0689f350",
+      "size": 33085
+    },
+    "assets/idle-poster.jpg": {
+      "hash": "6f9065d422",
+      "md5": "6f9065d422cc4f77bd29a23e56e5be56",
+      "size": 45856,
+      "inline": true
+    }
+  }
+}
