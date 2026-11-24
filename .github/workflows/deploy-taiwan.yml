@@ -1,0 +1,69 @@
+name: 部署台湾版到 Pages 子路径 /taiwan/
+
+# 目的：一个仓库只能发布一个 Pages 站点。台湾版（kiosk=tw01）与杭州镜像共用同一站点：
+#   根路径 /      = v2-with-l4（杭州镜像，内容不变）
+#   /taiwan/      = 本分支 taiwan-v185（台湾版）
+# 触发：推送 main 分支，或手动 Run workflow。
+#   注意：github-pages 环境保护只允许 main / v2-with-l4 部署，故工作流必须挂在 main 上跑。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 检出杭州镜像（站点根）
+        uses: actions/checkout@v4
+        with:
+          ref: v2-with-l4
+          path: _root
+      - name: 检出台湾版（/taiwan）
+        uses: actions/checkout@v4
+        with:
+          ref: taiwan-v185
+          path: _site/taiwan
+      - name: 组装站点（根 = 杭州镜像；/taiwan = 台湾版）
+        run: |
+          rm -rf _site/taiwan/.git _root/.git
+          rsync -a --exclude=.git --exclude=.github _root/ _site/
+          rm -rf _site/.github _site/taiwan/.github
+          echo "--- 站点根 ---"; ls _site | head -20
+          echo "--- 台湾版 ---"; ls _site/taiwan | head -30
+          du -sh _site _site/taiwan
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+      - name: 上传站点工件
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: 部署后自检
+        run: |
+          sleep 15
+          base="${{ steps.deployment.outputs.page_url }}"
+          fail=0
+          for p in "" "taiwan/" "taiwan/jiulong.html" "taiwan/l4-bridge.js"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 180 "${base}${p}")
+            echo "${base}${p} -> ${code}"
+            if [ "$code" != "200" ]; then fail=1; echo "::error::${base}${p} 返回 ${code}"; fi
+          done
+          title=$(curl -s --max-time 60 "${base}taiwan/" | grep -o '<title>[^<]*</title>' | head -1)
+          echo "台湾版标题：${title}"
+          exit $fail
