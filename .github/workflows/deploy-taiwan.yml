@@ -51,6 +51,8 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      - name: 等工件索引传播（部署前缓冲 45s，规避 No artifacts named 偶发失败）
+        run: sleep 45
       - name: 部署到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
