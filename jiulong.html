@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#18253d" />
   <meta name="description" content="九龙救白蛇：单关卡像素风2D物理弹射网页游戏" />
-  <title>九龙救白蛇 · 单文件离线版 v1.85</title>
+  <title>九龙救白蛇 · 单文件离线版 v1.86</title>
   <link rel="icon" href="data:," /><!-- 空图标:避免每条日志里多一个 favicon.ico 404 -->
   <script>
     /* v1.71 — 发布兜底：本页只允许在宿主 index.html 的 iframe 里跑（带 embed=1）。
@@ -1790,7 +1790,7 @@ function sweepTowerApron(){
  }
 }
 function notify(type,payload={}){
- try{window.parent.postMessage({source:'jiulong-baishe',type:'jiulong:'+type,version:'0.85',...payload},'*');}catch(e){}
+ try{window.parent.postMessage({source:'jiulong-baishe',type:'jiulong:'+type,version:'0.86',...payload},'*');}catch(e){}
 }
 function beep(freq=440,ms=.06,type='square',volume=.055){
  if(muted)return;
@@ -5941,10 +5941,26 @@ function drawWinComicBubble(bx,by,bw,bh,avatar,name,lines,tail,alpha){
  if(avatar&&avatar.complete&&avatar.naturalWidth)ctx.drawImage(avatar,px-pr,py-pr,pr*2,pr*2);
  ctx.restore();
  ctx.beginPath();ctx.arc(px,py,pr,0,Math.PI*2);ctx.lineWidth=3;ctx.strokeStyle='#171717';ctx.stroke();
+ // v1.86 — 用户 11-25:框内文字整块【垂直居中】。原来 name 基线写死 by+42、行首 by+78+i*34,
+ //   两行文字时末行基线落在 by+112(框高 120)→ 视觉上整体压到框底。
+ //   改为用实测字形度量算出整块高度 H(名字上沿→末行下沿),再按 (bh-H)/2 顶对齐;
+ //   行距 lh / 名字行距 pitchName 保持不变,只移动整块的起点。
  ctx.textAlign='left';ctx.fillStyle='#171717';
- ctx.font='bold 22px "Microsoft YaHei",sans-serif';ctx.fillText(name,bx+124,by+42);
- ctx.font='bold 24px "Microsoft YaHei",sans-serif';
- lines.forEach((s,i)=>ctx.fillText(s,bx+124,by+78+i*34));
+ const nameFont='bold 22px "Microsoft YaHei",sans-serif';
+ const lineFont='bold 24px "Microsoft YaHei",sans-serif';
+ const lh=34,pitchName=32;
+ ctx.font=nameFont;
+ const nM=ctx.measureText(name);
+ const nAsc=nM.actualBoundingBoxAscent||17;
+ ctx.font=lineFont;
+ const lMs=lines.map(s=>ctx.measureText(s));
+ const lAsc=Math.max(...lMs.map(m=>m.actualBoundingBoxAscent||18),18);
+ const lDesc=Math.max(...lMs.map(m=>m.actualBoundingBoxDescent||6),6);
+ const H=nAsc+pitchName+Math.max(0,lines.length-1)*lh+lDesc;
+ const nameBase=by+Math.max(6,(bh-H)/2)+nAsc;
+ ctx.font=nameFont;ctx.fillText(name,bx+124,nameBase);
+ ctx.font=lineFont;
+ lines.forEach((s,i)=>ctx.fillText(s,bx+124,nameBase+pitchName+i*lh));
  ctx.restore();
 }
 // Frame-by-frame camera animation, not a succession of still images.
@@ -6684,7 +6700,7 @@ window.JiulongGame={
      return {slot:n,id,name:C.heroes[id].name,h,visibleH,wx:px,wy:foot-h*.5,
        headX:hv.x,headY:hv.y,headCX:hc.x,bodyX:bv.x,bodyY:bv.y,footX:fv.x,footY:fv.y,
        screenX:bv.x,screenY:bv.y};})}),
- getState:()=>({phase,selected,selectedIndex,selectedSlot,manualPick,available:currentAvailable(),used:[...used],shots:shotCount,meteorCount:meteorShower.length,skill:spellState?.kind===6?'十二星陨':null,pillarsDown:world?fallenCount():0,background:'West Lake Daylight v0.25',towerX:C.tower.x,towerBaseY:C.tower.baseTop,waterWidthRatio:(C.land.rightStart-C.land.leftEnd)/C.width, heroPose:heroes.filter(h=>h&&h.data).map(h=>({hero:h.data.hero,flying:!!h.data.flying,hitFlyPose:!!h.data.hitFlyPose,impactAng:h.data.impactAng,roll:h.data.roll||0,x:Math.round(h.x),y:Math.round(h.y)})), camera:{x:camera.x,y:camera.y,zoom:camera.zoom}, launchSpeed:C.launchSpeed,flightTimeScale:C.flightTimeScale,launchDrag:C.flightDrag,voice:{engine:'edge-neural',dir:VOICE_DIR,playing:voiceBusy,muted,enterVoices:[...enterVoiceSet]},version:'0.85',roles:ROLE_VOICE.map((v,i)=>({name:C.heroes[i].name,persona:v.persona,voice:v.voice,thought:v.thought,lines:v.lines})),rescue:['白娘子','小青'].map(n=>{const c=CAST[castIndexByName(n)];return{name:c.name,voice:c.voice,line:c.lines.rescue};})})
+ getState:()=>({phase,selected,selectedIndex,selectedSlot,manualPick,available:currentAvailable(),used:[...used],shots:shotCount,meteorCount:meteorShower.length,skill:spellState?.kind===6?'十二星陨':null,pillarsDown:world?fallenCount():0,background:'West Lake Daylight v0.25',towerX:C.tower.x,towerBaseY:C.tower.baseTop,waterWidthRatio:(C.land.rightStart-C.land.leftEnd)/C.width, heroPose:heroes.filter(h=>h&&h.data).map(h=>({hero:h.data.hero,flying:!!h.data.flying,hitFlyPose:!!h.data.hitFlyPose,impactAng:h.data.impactAng,roll:h.data.roll||0,x:Math.round(h.x),y:Math.round(h.y)})), camera:{x:camera.x,y:camera.y,zoom:camera.zoom}, launchSpeed:C.launchSpeed,flightTimeScale:C.flightTimeScale,launchDrag:C.flightDrag,voice:{engine:'edge-neural',dir:VOICE_DIR,playing:voiceBusy,muted,enterVoices:[...enterVoiceSet]},version:'0.86',roles:ROLE_VOICE.map((v,i)=>({name:C.heroes[i].name,persona:v.persona,voice:v.voice,thought:v.thought,lines:v.lines})),rescue:['白娘子','小青'].map(n=>{const c=CAST[castIndexByName(n)];return{name:c.name,voice:c.voice,line:c.lines.rescue};})})
 };
 // v0.78 — 开场取景:把 cinemaTime 直接定位到某一刻(镜头/走位/构件下落全是纯时间函数),
 // 供截图脚本抓「塔建好 → 一层窗特写」这类瞬间,不用真的等 13 秒。
@@ -6726,6 +6742,8 @@ window.JiulongGame.debugWinGeom=()=>{
   towerX:C.tower.x,baseTop:C.tower.baseTop,baseY:C.tower.baseY};
 };
 if(debug){
+ // v1.86 — 验收专用:直接把对局推到胜利画面(绕开打塔),供漫画框排版截图/量测。
+ window.JiulongGame.debugJumpVictory=()=>{try{finishFired=false;finish(true);}catch(e){return 'ERR:'+e.message;}return {phase,clock:+victoryClock.toFixed(2)};};
  window.JiulongGame.debugWheel=()=>({phase,selectedIndex,spinTargetSlot,spinStepsDone,spinTotalSteps,spinSettled,
    // v1.00 — pointer 就是界面手指所指的那位(与出场同口径);domPointer 从 DOM 的 .selected 读,用来互校。
    pointer:pointerHeroName(),
