@@ -1111,6 +1111,7 @@
 </div>
 
 <script src="wx-shim.js?v=cb6c4e8ee6"></script>
+<script src="assets/qrcode.min.js?v=1"></script><!-- [台湾 v88] 网址码兜底渲染 -->
 <!-- [v39c 2026-11-12] runtime 模块源码内联（1.17MB 静态串行加载，boot 零并发零网络）：
      平台网关会掐并发 HTTP/2 流，冷启动 6 路并发预取被 RST → 模块缺失 → 同步 XHR 冻结主线程
      →「进入游戏卡住/打不开」。内联后 boot 必有全量源码，彻底绕开。改 runtime/*.js 后必须
@@ -3138,8 +3139,30 @@
       });
     }
     // 备用：池码（一次性、一人一局）。只在长期码不可用时使用。
+    // [台湾 v88 2026-11-25] 池码也拿不到时不再死循环「二维码补充中」——兜底渲染【网址码】：
+    //   把落地页 URL（带本局 sessionId 能力令牌）编成二维码，手机微信扫码 → 填昵称/选头像
+    //   → 点「启动现场游戏」→ 云端 web_confirm 原子确认 → 大屏轮询放行按空格开局。
+    //   URL 码不依赖微信 openapi（令牌时好时坏、池子补不回来），任何情况都保证台湾能开局。
+    function showUrlQr() {
+      if (!sessionId) return false;
+      fixedShownKiosk = '';
+      var kick2 = qs.get('kiosk') || 'tw01';
+      var url = location.origin + location.pathname.replace(/[^\/]*$/, '')
+              + 'phone-start.html?sid=' + encodeURIComponent(sessionId) + '&kiosk=' + encodeURIComponent(kick2);
+      qrEl.innerHTML = '';
+      try {
+        new QRCode(qrEl, { text: url, width: 178, height: 178, correctLevel: QRCode.CorrectLevel.M });
+      } catch (e) {
+        qrEl.innerHTML = '<div class="qr-warn">二维码组件异常</div>';
+        return false;
+      }
+      setState('手机扫码 → 点「启动现场游戏」 → 大屏按空格');
+      scheduleProactiveRefresh();
+      return true;
+    }
     function showPoolCode(d) {
       if (!d || !d.qrUrl || d.qrType !== 'wx_game_kiosk' || d.scene !== 'hz1_' + d.sessionId) {
+        if (sessionId && showUrlQr()) return;      // [台湾 v88] 网址码兜底（会话已建即可用）
         qrAttempts++;
         var elapsed = Math.round((Date.now() - qrStartedAt) / 1000);
         qrEl.innerHTML = '<div class="qr-warn">二维码补充中' +

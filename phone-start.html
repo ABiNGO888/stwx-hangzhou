@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>超级舌阿蜥 · 台湾店 · 启动现场游戏</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;min-height:100%;background:radial-gradient(120% 90% at 50% 0%,#15304f 0%,#0b1e33 60%,#081524 100%);
+    color:#fff;font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;text-align:center;}
+  .wrap{max-width:420px;margin:0 auto;padding:32px 22px 40px;}
+  h1{font-size:26px;margin:10px 0 4px;color:#ffd85f;letter-spacing:1px;}
+  .sub{font-size:14px;color:#9fb6cc;margin-bottom:26px;}
+  .card{background:#ffffff10;border:1px solid #ffffff26;border-radius:16px;padding:20px 18px;margin-bottom:18px;}
+  .label{font-size:15px;color:#cfe0f2;margin-bottom:10px;text-align:left;}
+  input{width:100%;font-size:19px;padding:13px 14px;border-radius:12px;border:1.5px solid #3d5877;
+    background:#0d2236;color:#fff;outline:none;text-align:center;}
+  input:focus{border-color:#ffd85f;}
+  .avrow{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;}
+  .av{width:56px;height:56px;border-radius:50%;border:3px solid transparent;background:#0d2236;
+    padding:0;overflow:hidden;cursor:pointer;}
+  .av img{width:100%;height:100%;display:block;}
+  .av.sel{border-color:#ffd85f;background:#1b3a58;}
+  button.go{width:100%;margin-top:6px;font-size:22px;font-weight:700;color:#081524;background:#ffd85f;
+    border:none;border-radius:14px;padding:16px 0;cursor:pointer;}
+  button.go:disabled{opacity:.5;}
+  .st{margin-top:16px;font-size:15px;color:#9fb6cc;min-height:22px;line-height:1.6;}
+  .ok h1{color:#7be08a;}
+  .ok .big{font-size:22px;color:#7be08a;font-weight:700;margin:14px 0 8px;}
+  .err .big{font-size:20px;color:#ff9d9d;font-weight:700;margin:14px 0 8px;}
+  .foot{font-size:12px;color:#5d7891;margin-top:26px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="wrap" id="main">
+  <h1>超级舌阿蜥 · 台湾店</h1>
+  <div class="sub">扫大屏二维码启动 · 与杭州现场同榜竞技</div>
+  <div class="card">
+    <div class="label">你的昵称（上榜显示）</div>
+    <input id="nick" maxlength="12" placeholder="给自己起个名字" value="">
+    <div class="label" style="margin-top:18px;">选个头像（可选）</div>
+    <div class="avrow" id="avrow"></div>
+  </div>
+  <button class="go" id="go">启动现场游戏</button>
+  <div class="st" id="st">点击按钮后，请回到大屏按空格键开始</div>
+  <div class="foot">台湾测试版 · 成绩与杭州现场共用同一份 500 强榜<br>
+    二维码过期请回大屏刷新后重扫</div>
+</div>
+<script>
+(function () {
+  var qs = new URLSearchParams(location.search.replace(/^\?/, ''));
+  var sid = String(qs.get('sid') || '').slice(0, 64);
+  var API = 'https://cloud1-d6gu6meu3ce6fd439-1455944636.ap-shanghai.app.tcloudbase.com/api/offline/session';
+
+  // 预设头像：SVG data URI（榜单 avatarSrc 支持 data:image/），无需上传、零依赖
+  var AVS = [
+    ['🐉', '#123a5e'], ['🐲', '#5e2312'], ['🐸', '#12482e'], ['🐍', '#3a1260'],
+    ['🦖', '#5c4a0e'], ['🦄', '#5e1250'], ['🐯', '#572908'], ['🐙', '#0e4a5c']
+  ];
+  function svgAvatar(emo, bg) {
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+      + '<rect width="64" height="64" fill="' + bg + '"/>'
+      + '<text x="32" y="43" font-size="34" text-anchor="middle">' + emo + '</text></svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(s);
+  }
+  var picked = '';
+  var row = document.getElementById('avrow');
+  AVS.forEach(function (a, i) {
+    var b = document.createElement('button');
+    b.className = 'av' + (i === 0 ? ' sel' : '');
+    b.type = 'button';
+    var img = document.createElement('img');
+    img.src = picked = (i === 0 ? svgAvatar(a[0], a[1]) : svgAvatar(a[0], a[1]));
+    b.appendChild(img);
+    b.onclick = function () {
+      picked = svgAvatar(a[0], a[1]);
+      Array.prototype.forEach.call(row.children, function (c) { c.classList.remove('sel'); });
+      b.classList.add('sel');
+    };
+    row.appendChild(b);
+  });
+
+  var go = document.getElementById('go'), st = document.getElementById('st'), main = document.getElementById('main');
+  function setSt(t) { st.textContent = t; }
+
+  if (!sid) {
+    document.getElementById('nick').disabled = true; go.disabled = true;
+    main.classList.add('err');
+    st.innerHTML = '<div class="big">链接不完整</div>请回大屏刷新二维码后重新扫码';
+    return;
+  }
+
+  var busy = false;
+  go.onclick = function () {
+    if (busy) return;
+    busy = true; go.disabled = true;
+    var nick = document.getElementById('nick').value.trim().slice(0, 12) || ('现场玩家' + Math.floor(1000 + Math.random() * 9000));
+    setSt('正在连接大屏…');
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'web_confirm', sessionId: sid, nick: nick, avatarUrl: picked })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.ok && d.verified) {
+        main.classList.add('ok');
+        main.innerHTML = '<h1>✓ 启动成功</h1>'
+          + '<div class="big">「' + nick + '」已就绪</div>'
+          + '<div style="font-size:16px;color:#cfe0f2;line-height:1.9;">大屏已出现「扫码成功」提示<br>请按 <b style="color:#ffd85f">空格键</b> 开始游戏</div>'
+          + '<div style="font-size:13px;color:#5d7891;margin-top:22px;">祝你上榜！</div>';
+        return;
+      }
+      busy = false; go.disabled = false;
+      var msg = (d && d.error === 'EXPIRED') ? '二维码已过期'
+              : (d && d.error === 'NOT_FOUND') ? '会话不存在，请重扫'
+              : (d && d.error === 'ALREADY_STARTED') ? '本局已开始'
+              : '连接失败，请重试';
+      main.classList.add('err');
+      st.innerHTML = '<div class="big">' + msg + '</div>请回大屏刷新二维码后重新扫码';
+    }).catch(function () {
+      busy = false; go.disabled = false;
+      setSt('网络异常，请检查网络后重试');
+    });
+  };
+})();
+</script>
+</body>
+</html>
