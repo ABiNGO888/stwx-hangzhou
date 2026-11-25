@@ -3661,13 +3661,25 @@
           if (payload && payload.ok) {
             wrap.hidden = true;                                  // 记分板退场 → 交给总榜浮层
             if (window.__kioskShowLeaderboard) window.__kioskShowLeaderboard(payload, total, failed2);
-              hideTimer = setTimeout(function () {                 // 动画 + 停留后自动收起（core 随后回首页）
-              if (window.__kioskHideLeaderboard) window.__kioskHideLeaderboard();
-              // [v42 现场 2026-11-01] 榜单收起即刻回待机：不再等 core 的 21s 兜底定时器。
-              //   否则收起后还会露出约 3 秒的死亡/结算残影（上面带「继续挑战」等按钮），
-              //   观众会以为还能继续玩。这里直接结束本轮 → 待机视频 + 等扫码。
-              endKioskRoundNow();
-            }, 6000);   // [回待机提速] 榜单定格停留 12.8s→6s（3s 滚动动画完整保留，总回待机 ~10s）
+              // [v1.87 2026-11-25 用户] 收榜必须等「公布名次/胜利音效」播完才回待机：
+              //   原死 6s = 3s 滚动 + 3s 定格，而音效 5.83s 从第 3 秒起播，到 8.8s 才结束 → 被掐掉 2.8s。
+              //   现在最短停留仍是 6s，之后每 200ms 检查一次音效结束时刻，播完立即收；
+              //   16s 硬上限兜底（静音/被浏览器拦截/音频挂起时不能把大屏钉在榜单上）。实测总回待机 ≈9s。
+              (function () {
+                var t0 = Date.now();
+                function tick() {
+                  var elapsed = Date.now() - t0, sfxEnd = 0;
+                  try { sfxEnd = (window.__kioskLbSfxEndsAt ? window.__kioskLbSfxEndsAt() : 0) || 0; } catch (eSfx) {}
+                  var sfxPlaying = sfxEnd > 0 && Date.now() < sfxEnd;
+                  if (elapsed < 6000 || (sfxPlaying && elapsed < 16000)) { hideTimer = setTimeout(tick, 200); return; }
+                  if (window.__kioskHideLeaderboard) window.__kioskHideLeaderboard();
+                  // [v42 现场 2026-11-01] 榜单收起即刻回待机：不再等 core 的 21s 兜底定时器。
+                  //   否则收起后还会露出约 3 秒的死亡/结算残影（上面带「继续挑战」等按钮），
+                  //   观众会以为还能继续玩。这里直接结束本轮 → 待机视频 + 等扫码。
+                  endKioskRoundNow();
+                }
+                hideTimer = setTimeout(tick, 200);
+              })();
           } else {
             // 云端不可用：保留原来的简单提示，不让观众看到空榜
             if (avatarEl) avatarEl.hidden = true;
@@ -3981,12 +3993,29 @@
     // [v95b] 记录在播句柄：榜单收起（hide→clearAll）时必须一并停掉，避免待机榜的胜利音效
     //   盖到下一段待机视频上（音效 5.8s > 定格 4s，不主动停会溢出 1.8s）。
     var lbSfxEls = [];
+    // [v1.87 2026-11-25 用户] 结算榜的「公布名次/胜利音效」(5.83s) 必须在收榜回待机【之前】播完。
+    //   旧逻辑收榜是 showWin 里的死 6s：滚动 3s 后才起播 → 音效到 8.8s 才结束，而 6s 就 hide()
+    //   → clearAll() → stopLbSfx() 把最后 ~2.8s 直接掐断（现场听感「音效没播完就跳回待机」）。
+    //   现在记录本段音效的「结束时刻」，由 showWin 轮询等它播完再收榜。
+    var lbSfxEndsAt = 0;
     function playLbSfx(file, delayMs, vol) {
       setTimeout(function () {
         try {
           var a = new Audio('res_core/audio/' + file);
           a.volume = (vol == null) ? 0.85 : vol;
           lbSfxEls.push(a);
+          // 结束时刻 = 起播时刻 + 时长；时长以素材 metadata 为准，读不到按 5900ms 兜底（同名换片不用改代码）
+          var startAt = Date.now();
+          lbSfxEndsAt = Math.max(lbSfxEndsAt, startAt + 5900);
+          try {
+            a.addEventListener('loadedmetadata', function () {
+              try {
+                if (isFinite(a.duration) && a.duration > 0) {
+                  lbSfxEndsAt = Math.max(lbSfxEndsAt, startAt + Math.round(a.duration * 1000) + 120);
+                }
+              } catch (eD) {}
+            });
+          } catch (eL) {}
           var p = a.play();
           if (p && p.catch) p.catch(function () {
             // [v64] 自动播放被浏览器拦截（大屏刷新后尚无任何按键/触摸手势）→
@@ -4009,6 +4038,8 @@
       for (var i = 0; i < lbSfxEls.length; i++) { try { lbSfxEls[i].pause(); } catch (e) {} }
       lbSfxEls = [];
     }
+    // 结算榜收榜等待用：本段音效的结束时刻（ms 时间戳；0 = 本局还没排过音效）
+    window.__kioskLbSfxEndsAt = function () { return lbSfxEndsAt; };
 
     // [2026-11-03] 500 强榜背景音乐（用户指定素材 res_core/audio/杭州排行榜.mp3，176s）：
     //   榜单出现即起、循环播放；行进到前 30 名、胜利音效响起前淡出（不硬切，避免突兀）。
@@ -4410,6 +4441,7 @@
     function show(payload, myTotal, failed) {
       idleGen += 1;                    // [v26] 结算态接管 → 作废在途待机插页链
       clearAll();
+      lbSfxEndsAt = 0;                 // [v1.87] 每局结算从零算「音效结束时刻」，不吃上一局的残值
       payload = payload || {};
       failed = !!failed;
       var top = dedupeLeaderboard(payload.top || []);   // [v80] 同一账号只留一个最高分（幂等）
@@ -4570,6 +4602,7 @@
     //   与结算态的区别：无「我的名次」区、无高亮行、无公布名次音效，且 z-index 降到 6（见 CSS #lbWrap.idle）。
     function showIdle(cb) {
       clearAll();
+      lbSfxEndsAt = 0;                 // [v1.87] 待机榜音效不参与结算收榜等待
       idleGen += 1;
       var gen = idleGen;
       var sid = String(window.__kioskSessionId || '');
